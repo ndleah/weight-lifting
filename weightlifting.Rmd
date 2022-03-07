@@ -1,0 +1,169 @@
+---
+title: "Gender Weighlifting Gap"
+output: 
+  html_document:
+    fig_caption: yes
+    smart: no
+    number_sections: true
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview 
+
+As for the first visualization tool in this blog series, I have chosen R, specifically the suite of `tidyverse` packages, for this analysis as they provide comprehensive suite of tools for data manipulation and visualisation. For the purposes of this tutorial, I’m using International Powerlifting Federation weightlifting data from Kaggle to look at *differences in top lifts by sex*. 
+
+## Why dumbbell plots?
+
+Dumbbell plots are an alternative to grouped barcharts. Like barcharts, they show differences between populations and they more powerfully represent the distances between two groups. Thus, I will employ the dumbbell visualization in this blog along with R as the based tool to highlight the differences between top weightlifting between men and women.
+
+## A walkthrough
+
+### Data Preparation
+
+These are the packages we’ll need to get started. I will first load these libraries into R in order to perform data wrangling and visualization afterwards:
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)              # data visualization
+library(tidyverse)            # data manipulation
+library(ggtext)               # adding custom text on the viz
+library(ggalt)                # dumbbell visualization
+library(here)                 # import fie directory path
+library(lubridate)            # time series data manipulation
+library(ggthemes)             # set plot theme
+```
+
+Next, I'll do some minor cleaning and then reshape the three lifts into one column:
+
+```{r message=FALSE, warning=FALSE}
+# Load the dataset
+df <- read_csv(here("data/lift.csv")) %>%
+  mutate(year = year(date))
+
+# Reshape the data
+data <- df %>%
+  # Reshape the three lifts into one column
+  pivot_longer(
+    # specify 3 columns need to merge into 1
+    cols = c("best3squat_kg", "best3bench_kg", "best3deadlift_kg"), 
+    # create new combined column as "lift 
+    names_to = "lift") 
+```
+
+For my visualization, I’m only concerned with the heaviest lifts from each year:
+
+```{r message=FALSE, warning=FALSE}
+# Select top heaviest lifts for each year
+max_lift <- data %>%
+  # group the df by necessary values
+  group_by(year, sex, lift) %>%
+  # select top N=1 highest value by group
+  top_n(1, value) %>% 
+  ungroup %>%
+  distinct(year, lift, value, .keep_all = TRUE)
+```
+
+In order to construct a dumbbell plot, we need both male and female observations in the same row. For this, we use the spread function.
+
+```{r message=FALSE, warning=FALSE}
+# Split sex column into 2 new columns with each gender lifting record
+max_pivot <- max_lift %>%
+  spread(sex, value)
+```
+
+Now, let’s construct a dataframe for each sex:
+
+```{r message=FALSE, warning=FALSE}
+# Construct a dataframe for each gender
+male_lifts <- max_pivot %>%
+  # remove unnecessary column
+  select(-name) %>%
+  # subset rows where not contain null value in Male column  
+  filter(!is.na(M)) %>%
+  group_by(year, lift) %>%
+  # calculate averge lift
+  summarise(male = mean(M))
+
+female_lifts <- max_pivot %>%
+  # remove unnecessary column
+  select(-name) %>%
+  # subset rows where not contain null value in Female column
+  filter(!is.na(F)) %>%
+  group_by(year, lift) %>%
+  # calculate averge lift
+  summarise(female = mean(F))
+```
+
+And join them:
+
+```{r message=FALSE, warning=FALSE}
+# Merge them together
+total_max_lift <- merge(male_lifts, female_lifts) %>%
+  group_by(year, lift)
+```
+
+
+Here’s what our data looks like in its final form:
+
+```{r}
+# View the final dataset
+total_max_lift %>% 
+  reactable::reactable()
+```
+
+
+### Visualize!
+
+Finally, we can construct the visualization.
+
+In order to create dumbbell visualization, I employed the `ggalt` along with `ggplot2` packages to plot our data visualization. `geom_dumbbell` reads in our data and creates the dumbbells: we specify the beginning (x) of each dumbbell to represent Women and the end (x-end) to correspond to Men. Other specifications affect the accompanying line and points.
+
+```{r}
+total_max_lift %>%
+  #  filter 2019 record
+  filter(year == 2019) %>%
+  ggplot() +
+  # plot dumbbell plot
+  ggalt::geom_dumbbell(aes(y = lift,
+                    x = female, xend = male),
+                colour = "grey", size = 5,
+                colour_x = "#D6604C", colour_xend = "#395B74") +
+  labs(
+    # add y label
+    y = element_blank(),
+    # add x label
+    x = "Top Lift Recorded (kg)",
+    # add visualization title
+    title =  "How Women and Men Differ in Top Lifts (2019)") +
+  theme(
+    # customize title configuration
+    plot.title = element_markdown(lineheight = 1.1, size = 20)) +
+  # Position scales for discrete data
+  scale_y_discrete(labels = c("Bench", "Deadlift", "Squat")) +
+  # set plot theme
+  theme_minimal()
+```
+
+Already, we can begin to see the barebones for the finished version: each dumbbell represents the gap between weighlighting between Men and Women. As transparent from the plot, men heaviest lift in all divisions including Squat, Deadlift and Bench are higher than women with Bench draws the most gap between 2 genders.
+
+## Tool Strengths
+
+* **Structure** – With appropriate instructions, ggplot will output well aligned, well-formatted results. To recreate the same visualisation in Excel for example, would be possible but not without significant effort to manually bring everything into line.\
+* **Scalability** – using a code to generate plots means over time, with enough practice you start to build up a blueprint for building visualisations over time, encouraging rapid prototyping.\
+Community support – consider this an indirect strength. Very often problems faced by users have been raised (and answered) by others in an online forum. Documentation is also excellent.\
+* **Flexibility** – many geometry options (bars, points, lines, violins, tiles etc) give you wide creative scope for visualising your data. Change a visualisation with a simple code change (quicker than Excel).\
+* **Highly customisable** – Every aspect of your plot elements can be customised.
+
+## Challenges
+
+* **Learning curve (complexity)** – the frustration of “How do I?” or “If only I could…” moments are very real when using ggplot and R. My assumption is that most people (I did) would dive into ggplot without first understanding of the grammar of graphics. No user interface like Excel or Tableau.\
+* **Limited interactivity** – unless you wrap your ggplots in a Shiny dashboard or use plotly, ggplot lacks the interactivity native that Tableau, D3 or even Excel can provide.\
+* **Slow for exploratory analysis** – In Tableau you can rapidly slice, dice and visualise your data, but with R it will take longer to prepare the data and write the code to do the same actions.
+
+Original data source:
+https://openpowerlifting.gitlab.io/opl-csv/
