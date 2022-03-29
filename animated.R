@@ -16,7 +16,7 @@ library(ggtext)
 library(gifski)
 library(gganimate)
 library(cr)
-
+library(here)
 theme_set(theme_minimal())
 
 
@@ -80,6 +80,38 @@ total_max_lift <- merge(male_lifts, female_lifts) %>%
 ##---------------------------------------------------------------
 ##  Data Visualization                                         --
 ##---------------------------------------------------------------
+# Static Plot for 2019
+total_max_lift %>%
+  #  filter 2019 record
+  filter(year == 2019) %>%
+  ggplot() +
+  # plot dumbbell plot
+  ggalt::geom_dumbbell(aes(y = lift,
+                           x = female, xend = male),
+                       colour = "grey", size = 5,
+                       colour_x = "#D6604C", colour_xend = "#395B74") +
+  labs(
+    # add y label
+    y = element_blank(),
+    # add x label
+    x = "Top Lift Recorded (kg)",
+    # add visualization title
+    title =  "How Women and Men Differ in Top Lifts (2019)") +
+  theme(
+    # customize title configuration
+    plot.title = element_markdown(lineheight = 1.1, size = 20)) +
+  # Position scales for discrete data
+  scale_y_discrete(labels = c("Bench", "Deadlift", "Squat")) +
+  geom_text(aes(x = female, y = lift, label = paste(female, "kg")),
+            color = "#D6604C", size = 4, vjust = -2) +
+  geom_text(aes(x = male, y = lift, label = paste(male, "kg")),
+            color = "#395B74", size = 4, vjust = -2) +
+  geom_rect(aes(xmin=430, xmax=470, ymin=-Inf, ymax=Inf), fill="grey80") +
+  geom_text(aes(label=diff, y=lift, x=450), size=4) +
+  geom_text(aes(x=450, y=3, label="Difference"),
+            color="grey20", size=4, vjust=-3)
+
+
 # Weightlifting Gender Gap Overtime
 animation <- total_max_lift %>%
   ggplot() +
@@ -150,7 +182,11 @@ a_mgif <- image_read(a_gif)
 b_mgif <- image_read(b_gif)
 
 new_gif <- image_append(c(a_mgif[1], b_mgif[1]), stack = TRUE)
-for(i in 2:250){
+new_gif
+
+# render in total 249 frames
+for(i in 2:170){
   combined <- image_append(c(a_mgif[i], b_mgif[i]), stack = TRUE)
   new_gif <- c(new_gif, combined)
 }
+new_gif
