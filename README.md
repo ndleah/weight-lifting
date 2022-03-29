@@ -8,6 +8,12 @@
 
 > The aim of this project is to identify the gap between weightlifting by gender.
 
+## ✨  Output
+The final output looks like this:
+
+<p align="center">
+  <img width=100% height=100%" src="output.gif">
+
 ## ✨ Contribution
 
 Contributions, issues, and feature requests are welcome!
